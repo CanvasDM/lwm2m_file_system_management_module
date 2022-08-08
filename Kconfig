@@ -1,0 +1,31 @@
+#
+# Copyright (c) 2022 Laird Connectivity LLC
+#
+# SPDX-License-Identifier: LicenseRef-LairdConnectivity-Clause
+#
+menuconfig LCZ_LWM2M_FS_MANAGEMENT
+	bool "LCZ LwM2M File System Management"
+	depends on LCZ_LWM2M_CLIENT
+	depends on FILE_SYSTEM_UTILITIES
+	depends on FSU_CHECKSUM
+
+if LCZ_LWM2M_FS_MANAGEMENT
+
+module=LCZ_LWM2M_FS_MANAGEMENT
+module-str=LCZ_LWM2M_FS_MANAGEMENT
+source "subsys/logging/Kconfig.template.log_config"
+
+config LCZ_LWM2M_FS_MGMT_INIT_PRIORITY
+	int "LwM2M filesystem object init priority"
+	range 0 99
+	default APPLICATION_INIT_PRIORITY
+
+config LCZ_LWM2M_FS_MGMT_ACTIVE_PATH_LEN
+	int "Maximum size of the file system management object's active path string"
+	default FSU_MAX_FILE_NAME_SIZE
+
+config LCZ_LWM2M_FS_MGMT_MAX_DIRECTORY_LIST
+	int "Maximum number of entries in a directory listing"
+	default 16
+
+endif # LCZ_LWM2M_FS_MANAGEMENT
