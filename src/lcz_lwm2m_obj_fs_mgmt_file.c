@@ -85,6 +85,9 @@ static char lwm2m_fs_mgmt_file_error[MAX_STATUS_STRING];
 
 static lcz_lwm2m_obj_fs_mgmt_permission_cb permission_cb = NULL;
 
+/* The block buffer holds data used for active read and write operations */
+static uint8_t block_buffer[CONFIG_LCZ_LWM2M_COAP_BLOCK_SIZE];
+
 /**************************************************************************************************/
 /* Local Function Prototypes                                                                      */
 /**************************************************************************************************/
@@ -93,6 +96,8 @@ static void *cb_read(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id
 static void *cb_read_block(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id,
 			   size_t offset, size_t read_len, uint8_t *data, size_t *data_len,
 			   bool *last_block);
+static void *cb_pre_write(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id,
+			  size_t *data_len);
 static int cb_write_content(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id,
 			    uint8_t *data, uint16_t data_len, bool last_block, size_t total_size);
 static int cb_exec_delete(uint16_t obj_inst_id, uint8_t *args, uint16_t args_len);
@@ -146,7 +151,6 @@ static void set_error(const char *error_string)
  */
 static void *cb_read(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id, size_t *data_len)
 {
-	static uint8_t block_buffer[CONFIG_LCZ_LWM2M_COAP_BLOCK_SIZE];
 	char abs_path[FSU_MAX_ABS_PATH_SIZE + 1];
 	struct fs_dirent entry;
 	int ret;
@@ -315,6 +319,30 @@ static void *cb_read_block(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_i
 	}
 
 	return data;
+}
+
+/**
+ * @brief Pre-write file callback
+ *
+ * This function returns the pointer to our internal buffer. This buffer is used for
+ * both reads and writes of files. It is returned using the pre_write callback as a
+ * convenience for the engine.
+ *
+ * @param[in] obj_inst_id Object instance ID generating the callback.
+ * @param[in] res_id Resource ID generating the callback.
+ * @param[in] res_inst_id Resource instance ID generating the callback
+ *                        (typically 0 for non-multi instance resources).
+ * @param[out] data_len Length of the data buffer returned by the function
+ *
+ * @returns A data pointer to be used for accessing the file (read or write)
+ */
+static void *cb_pre_write(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id,
+			  size_t *data_len)
+{
+	if (data_len != NULL) {
+		*data_len = sizeof(block_buffer);
+	}
+	return block_buffer;
 }
 
 /**
@@ -624,8 +652,8 @@ static struct lwm2m_engine_obj_inst *fs_mgmt_file_create(uint16_t obj_inst_id)
 		     lwm2m_fs_mgmt_file_active_path, sizeof(lwm2m_fs_mgmt_file_active_path), NULL,
 		     NULL, NULL, NULL, NULL);
 	INIT_OBJ_RES_BLOCK(FS_MGMT_FILE_CONTENT_ID, res, i, res_inst, j, 1, false, true,
-			   (uint8_t *)NULL, 0, cb_read, cb_read_block, NULL, NULL, cb_write_content,
-			   NULL);
+			   (uint8_t *)NULL, 0, cb_read, cb_read_block, cb_pre_write, NULL,
+			   cb_write_content, NULL);
 	INIT_OBJ_RES_EXECUTE(FS_MGMT_FILE_DELETE_ID, res, i, cb_exec_delete);
 	INIT_OBJ_RES_EXECUTE(FS_MGMT_FILE_CREATE_ID, res, i, cb_exec_create);
 	INIT_OBJ_RES_EXECUTE(FS_MGMT_FILE_EXECUTE_ID, res, i, cb_exec_execute);
