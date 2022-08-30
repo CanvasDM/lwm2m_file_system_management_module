@@ -8,10 +8,8 @@
 /**************************************************************************************************/
 /* Includes                                                                                       */
 /**************************************************************************************************/
-#define LOG_MODULE_NAME net_lwm2m_obj_fs_dir
-#define LOG_LEVEL CONFIG_LCZ_LWM2M_LOG_LEVEL
 #include <logging/log.h>
-LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+LOG_MODULE_REGISTER(net_lwm2m_obj_fs_dir, CONFIG_LCZ_LWM2M_FS_MANAGEMENT_LOG_LEVEL);
 
 #include <string.h>
 #include <init.h>

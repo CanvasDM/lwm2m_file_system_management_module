@@ -8,10 +8,8 @@
 /**************************************************************************************************/
 /* Includes                                                                                       */
 /**************************************************************************************************/
-#define LOG_MODULE_NAME net_lwm2m_obj_fs_file
-#define LOG_LEVEL CONFIG_LCZ_LWM2M_LOG_LEVEL
 #include <logging/log.h>
-LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+LOG_MODULE_REGISTER(net_lwm2m_obj_fs_file, CONFIG_LCZ_LWM2M_FS_MANAGEMENT_LOG_LEVEL);
 
 #include <string.h>
 #include <init.h>
@@ -120,6 +118,7 @@ static void set_error(const char *error_string)
 	if (strcmp(lwm2m_fs_mgmt_file_error, error_string) != 0) {
 		memset(lwm2m_fs_mgmt_file_error, 0, sizeof(lwm2m_fs_mgmt_file_error));
 		strcpy(lwm2m_fs_mgmt_file_error, error_string);
+		LOG_DBG("err [%s]", lwm2m_fs_mgmt_file_error);
 		NOTIFY_OBSERVER(LWM2M_OBJECT_FS_MGMT_FILE_ID, 0, FS_MGMT_FILE_ERROR_ID);
 	}
 }
@@ -213,6 +212,9 @@ static void *cb_read(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id
 	read_len = *data_len;
 	if (read_len > sizeof(block_buffer)) {
 		read_len = sizeof(block_buffer);
+		LOG_INF("Start read file %s, size %d", abs_path, entry.size);
+	} else {
+		LOG_INF("Read file %s, size %d", abs_path, entry.size);
 	}
 
 /* Read the block from the file */
@@ -225,6 +227,7 @@ static void *cb_read(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id
 		ret = fsu_read_abs_block(abs_path, 0, block_buffer, read_len);
 	}
 	if (ret < 0) {
+		LOG_ERR("Could not read from file %s [%d]", abs_path, ret);
 		set_error(ERROR_GENERIC);
 		*data_len = 0;
 		return NULL;
@@ -310,11 +313,13 @@ static void *cb_read_block(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_i
 		set_error(ERROR_GENERIC);
 		return NULL;
 	}
+	LOG_DBG("Read file at offset %d, read %d", offset, ret);
 
 	/* Update the tracking variables */
 	*data_len = ret;
 	*last_block = false;
 	if (offset + *data_len >= entry.size) {
+		LOG_INF("Finished reading file %s", abs_path);
 		*last_block = true;
 	}
 
