@@ -391,7 +391,7 @@ static int cb_write_content(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_
 
 	/* Never allow writes to a directory */
 	if (ret == 0 && entry.type == FS_DIR_ENTRY_DIR) {
-		LOG_ERR("cb_write_content: Cannot write to a directory %s", log_strdup(abs_path));
+		LOG_ERR("cb_write_content: Cannot write to a directory %s", abs_path);
 		set_error(ERROR_NO_PERM);
 		return -EISDIR;
 	}
@@ -412,12 +412,13 @@ static int cb_write_content(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_
 
 	/* If this is the first block, make sure the file is empty */
 	if (write_offset == 0) {
+		LOG_INF("Start write file %s", abs_path);
 		if (ret == 0 && entry.size > 0) {
 			ret = fs_unlink(abs_path);
 			if (ret < 0) {
 				set_error(ERROR_GENERIC);
-				LOG_ERR("cb_write_content: Failed to unlink file %s: %d",
-					log_strdup(abs_path), ret);
+				LOG_ERR("cb_write_content: Failed to unlink file %s: %d", abs_path,
+					ret);
 				return ret;
 			}
 		}
@@ -429,7 +430,7 @@ static int cb_write_content(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_
 		if (ret < 0) {
 			set_error(ERROR_GENERIC);
 			LOG_ERR("cb_write_content: Attempt to append to non-existant file %s: %d",
-				log_strdup(abs_path), ret);
+				abs_path, ret);
 			return ret;
 		}
 
@@ -445,7 +446,7 @@ static int cb_write_content(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_
 		if (write_offset != file_size) {
 			set_error(ERROR_GENERIC);
 			LOG_ERR("cb_write_content: Attempt to append to middle of file %s: offset %d size %d",
-				log_strdup(abs_path), write_offset, file_size);
+				abs_path, write_offset, file_size);
 			return -EINVAL;
 		}
 	}
@@ -460,7 +461,7 @@ static int cb_write_content(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_
 	}
 	if (ret < 0) {
 		set_error(ERROR_GENERIC);
-		LOG_ERR("cb_write_content: Error appending to %s: %d", log_strdup(abs_path), ret);
+		LOG_ERR("cb_write_content: Error appending to %s: %d", abs_path, ret);
 		return ret;
 	}
 	if (ret != data_len) {
@@ -469,9 +470,11 @@ static int cb_write_content(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_
 			log_strdup(abs_path), ret, data_len);
 		return -ENOSPC;
 	}
+	LOG_DBG("Wrote %d bytes to %s", data_len, abs_path);
 
 	/* Update write pointer into file */
 	if (last_block) {
+		LOG_INF("Finish write file %s, size: %d", abs_path, file_size + data_len);
 		write_offset = 0;
 	} else {
 		write_offset += data_len;
