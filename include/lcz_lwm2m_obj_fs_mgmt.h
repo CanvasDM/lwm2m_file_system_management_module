@@ -38,6 +38,15 @@ extern "C" {
  */
 typedef bool (*lcz_lwm2m_obj_fs_mgmt_permission_cb)(const char *path, bool write);
 
+/**
+ * @brief Function to be called on LwM2M file execute operation
+ *
+ * @param path path of the file to be executed
+ *
+ * @return 0 on success or <0 on errro
+ */
+typedef int (*lcz_lwm2m_obj_fs_mgmt_exec_cb)(const char *path);
+
 /**************************************************************************************************/
 /* Global Function Prototypes                                                                     */
 /**************************************************************************************************/
@@ -46,7 +55,14 @@ typedef bool (*lcz_lwm2m_obj_fs_mgmt_permission_cb)(const char *path, bool write
  *
  * @param cb Callback function or NULL to disable.
  */
-void lcz_lwm2m_obj_fs_mgmt_register_cb(lcz_lwm2m_obj_fs_mgmt_permission_cb cb);
+void lcz_lwm2m_obj_fs_mgmt_reg_perm_cb(lcz_lwm2m_obj_fs_mgmt_permission_cb cb);
+
+/**
+ * @brief Register file execute callback function
+ *
+ * @param cb Callback function or NULL to disable.
+ */
+void lcz_lwm2m_obj_fs_mgmt_reg_exec_cb(lcz_lwm2m_obj_fs_mgmt_exec_cb cb);
 
 #ifdef __cplusplus
 }

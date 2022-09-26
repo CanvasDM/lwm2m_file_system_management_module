@@ -82,6 +82,7 @@ static char lwm2m_fs_mgmt_file_status[MAX_STATUS_STRING];
 static char lwm2m_fs_mgmt_file_error[MAX_STATUS_STRING];
 
 static lcz_lwm2m_obj_fs_mgmt_permission_cb permission_cb = NULL;
+static lcz_lwm2m_obj_fs_mgmt_exec_cb execute_cb = NULL;
 
 /* The block buffer holds data used for active read and write operations */
 static uint8_t block_buffer[CONFIG_LCZ_LWM2M_COAP_BLOCK_SIZE];
@@ -611,8 +612,22 @@ static int cb_exec_create(uint16_t obj_inst_id, uint8_t *args, uint16_t args_len
  */
 static int cb_exec_execute(uint16_t obj_inst_id, uint8_t *args, uint16_t args_len)
 {
-	/*TODO when shell scripts are implemented*/
-	return 0;
+	char abs_path[FSU_MAX_ABS_PATH_SIZE + 1];
+	int retval = -EPERM;
+
+	/* Build the current path */
+	(void)fsu_build_full_name(abs_path, sizeof(abs_path), CONFIG_FSU_MOUNT_POINT,
+				  lwm2m_fs_mgmt_file_active_path);
+
+	/* Call the registered execute callback */
+	if (execute_cb != NULL) {
+		retval = execute_cb(abs_path);
+	}
+
+	/* Log the result */
+	LOG_INF("Execute file %s: %d", abs_path, retval);
+
+	return retval;
 }
 
 /**
@@ -679,9 +694,14 @@ static struct lwm2m_engine_obj_inst *fs_mgmt_file_create(uint16_t obj_inst_id)
 /**************************************************************************************************/
 /* Global Function Definitions                                                                    */
 /**************************************************************************************************/
-void lcz_lwm2m_obj_fs_mgmt_register_cb(lcz_lwm2m_obj_fs_mgmt_permission_cb cb)
+void lcz_lwm2m_obj_fs_mgmt_reg_perm_cb(lcz_lwm2m_obj_fs_mgmt_permission_cb cb)
 {
 	permission_cb = cb;
+}
+
+void lcz_lwm2m_obj_fs_mgmt_reg_exec_cb(lcz_lwm2m_obj_fs_mgmt_exec_cb cb)
+{
+	execute_cb = cb;
 }
 
 /**************************************************************************************************/
