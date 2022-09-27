@@ -41,9 +41,16 @@ typedef bool (*lcz_lwm2m_obj_fs_mgmt_permission_cb)(const char *path, bool write
 /**
  * @brief Function to be called on LwM2M file execute operation
  *
+ * If this callback function returns success (0), the function
+ * lcz_lwm2m_obj_fs_mgmt_exec_complete() MUST be called at some point to
+ * report on the status of the execution.  The ...complete() function can be
+ * called either inside of this execute callback or at some point afterwards.
+ * If this callback function returns an error (<0), the complete function
+ * should not be called.
+ *
  * @param path path of the file to be executed
  *
- * @return 0 on success or <0 on errro
+ * @return 0 on success or <0 on error
  */
 typedef int (*lcz_lwm2m_obj_fs_mgmt_exec_cb)(const char *path);
 
@@ -63,6 +70,13 @@ void lcz_lwm2m_obj_fs_mgmt_reg_perm_cb(lcz_lwm2m_obj_fs_mgmt_permission_cb cb);
  * @param cb Callback function or NULL to disable.
  */
 void lcz_lwm2m_obj_fs_mgmt_reg_exec_cb(lcz_lwm2m_obj_fs_mgmt_exec_cb cb);
+
+/**
+ * @brief Report the result of an execute operation
+ *
+ * @param result The result of the execute (0 = success, <0 on failure)
+ */
+void lcz_lwm2m_obj_fs_mgmt_exec_complete(int result);
 
 #ifdef __cplusplus
 }

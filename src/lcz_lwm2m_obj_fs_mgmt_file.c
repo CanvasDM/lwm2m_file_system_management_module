@@ -35,6 +35,8 @@ LOG_MODULE_REGISTER(net_lwm2m_obj_fs_file, CONFIG_LCZ_LWM2M_FS_MANAGEMENT_LOG_LE
 #define FS_MGMT_FILE_VERSION_MAJOR 1
 #define FS_MGMT_FILE_VERSION_MINOR 0
 
+#define FS_MGMT_FILE_PATH_FIELD 0
+
 #define FS_MGMT_FILE_PATH_ID 0
 #define FS_MGMT_FILE_CONTENT_ID 1
 #define FS_MGMT_FILE_DELETE_ID 2
@@ -52,11 +54,36 @@ LOG_MODULE_REGISTER(net_lwm2m_obj_fs_file, CONFIG_LCZ_LWM2M_FS_MANAGEMENT_LOG_LE
 
 #define MAX_STATUS_STRING 16
 #define STATUS_IDLE "idle"
+#define STATUS_BUSY "busy"
 #define ERROR_OKAY "none"
 #define ERROR_NO_PERM "no permission"
 #define ERROR_GENERIC "error"
 
 #define RES_INST_COUNT (FS_MGMT_FILE_MAX_ID - 3)
+
+/* Time to stay in "busy" state without requests from server */
+#define BUSY_STATUS_TIMEOUT 15 /* seconds */
+
+/**************************************************************************************************/
+/* Local Function Prototypes                                                                      */
+/**************************************************************************************************/
+static void set_status(const char *status_string);
+static void set_error(const char *error_string);
+static void busy_timeout_handler(struct k_work *work);
+static void *cb_read(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id, size_t *data_len);
+static void *cb_read_block(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id,
+			   size_t offset, size_t read_len, uint8_t *data, size_t *data_len,
+			   bool *last_block);
+static void *cb_pre_write(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id,
+			  size_t *data_len);
+static int cb_write_content(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id,
+			    uint8_t *data, uint16_t data_len, bool last_block, size_t total_size);
+static int cb_exec_delete(uint16_t obj_inst_id, uint8_t *args, uint16_t args_len);
+static int cb_exec_create(uint16_t obj_inst_id, uint8_t *args, uint16_t args_len);
+static int cb_exec_execute(uint16_t obj_inst_id, uint8_t *args, uint16_t args_len);
+static int cb_exec_reset(uint16_t obj_inst_id, uint8_t *args, uint16_t args_len);
+static struct lwm2m_engine_obj_inst *fs_mgmt_file_create(uint16_t obj_inst_id);
+static int lwm2m_fs_mgmt_file_init(const struct device *dev);
 
 /**************************************************************************************************/
 /* Local Data Definitions                                                                         */
@@ -87,28 +114,40 @@ static lcz_lwm2m_obj_fs_mgmt_exec_cb execute_cb = NULL;
 /* The block buffer holds data used for active read and write operations */
 static uint8_t block_buffer[CONFIG_LCZ_LWM2M_COAP_BLOCK_SIZE];
 
-/**************************************************************************************************/
-/* Local Function Prototypes                                                                      */
-/**************************************************************************************************/
-static void set_error(const char *error_string);
-static void *cb_read(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id, size_t *data_len);
-static void *cb_read_block(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id,
-			   size_t offset, size_t read_len, uint8_t *data, size_t *data_len,
-			   bool *last_block);
-static void *cb_pre_write(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id,
-			  size_t *data_len);
-static int cb_write_content(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id,
-			    uint8_t *data, uint16_t data_len, bool last_block, size_t total_size);
-static int cb_exec_delete(uint16_t obj_inst_id, uint8_t *args, uint16_t args_len);
-static int cb_exec_create(uint16_t obj_inst_id, uint8_t *args, uint16_t args_len);
-static int cb_exec_execute(uint16_t obj_inst_id, uint8_t *args, uint16_t args_len);
-static int cb_exec_reset(uint16_t obj_inst_id, uint8_t *args, uint16_t args_len);
-static struct lwm2m_engine_obj_inst *fs_mgmt_file_create(uint16_t obj_inst_id);
-static int lwm2m_fs_mgmt_file_init(const struct device *dev);
+/* Delayble work for "busy" status timeout */
+static K_WORK_DELAYABLE_DEFINE(busy_timeout, busy_timeout_handler);
 
 /**************************************************************************************************/
 /* Local Function Definitions                                                                     */
 /**************************************************************************************************/
+/**
+ * @brief Set the status string
+ *
+ * @param[in] status_string New status string to set
+ */
+static void set_status(const char *status_string)
+{
+	if (strcmp(lwm2m_fs_mgmt_file_status, status_string) != 0) {
+		memset(lwm2m_fs_mgmt_file_status, 0, sizeof(lwm2m_fs_mgmt_file_status));
+		strcpy(lwm2m_fs_mgmt_file_status, status_string);
+		LOG_DBG("status [%s]", lwm2m_fs_mgmt_file_status);
+		NOTIFY_OBSERVER(LWM2M_OBJECT_FS_MGMT_FILE_ID, 0, FS_MGMT_FILE_STATUS_ID);
+	}
+
+	/* Make the File Path resource read-only when the status is busy */
+	if (strcmp(lwm2m_fs_mgmt_file_status, STATUS_BUSY) == 0) {
+		fields[FS_MGMT_FILE_PATH_FIELD].permissions = LWM2M_PERM_R;
+
+		/* Set/reset a timer to time out the busy state */
+		k_work_reschedule(&busy_timeout, K_SECONDS(BUSY_STATUS_TIMEOUT));
+	} else {
+		fields[FS_MGMT_FILE_PATH_FIELD].permissions = LWM2M_PERM_RW;
+
+		/* Cancel the timer */
+		k_work_cancel_delayable(&busy_timeout);
+	}
+}
+
 /**
  * @brief Set the error string
  *
@@ -122,6 +161,21 @@ static void set_error(const char *error_string)
 		LOG_DBG("err [%s]", lwm2m_fs_mgmt_file_error);
 		NOTIFY_OBSERVER(LWM2M_OBJECT_FS_MGMT_FILE_ID, 0, FS_MGMT_FILE_ERROR_ID);
 	}
+}
+
+/**
+ * @brief Delayable work handler for "busy" status timeout
+ *
+ * When the status is set to "busy" for too long without any activity from the
+ * server, the status is automatically reset back to "idle" to allow other
+ * operations to take place.
+ *
+ * @param[in] work Delayed work item
+ */
+static void busy_timeout_handler(struct k_work *work)
+{
+	LOG_ERR("File operation timed out");
+	set_status(STATUS_IDLE);
 }
 
 /**
@@ -214,6 +268,7 @@ static void *cb_read(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id
 	if (read_len > sizeof(block_buffer)) {
 		read_len = sizeof(block_buffer);
 		LOG_INF("Start read file %s, size %d", abs_path, entry.size);
+		set_status(STATUS_BUSY);
 	} else {
 		LOG_INF("Read file %s, size %d", abs_path, entry.size);
 	}
@@ -322,6 +377,7 @@ static void *cb_read_block(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_i
 	if (offset + *data_len >= entry.size) {
 		LOG_INF("Finished reading file %s", abs_path);
 		*last_block = true;
+		set_status(STATUS_IDLE);
 	}
 
 	return data;
@@ -414,6 +470,7 @@ static int cb_write_content(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_
 	/* If this is the first block, make sure the file is empty */
 	if (write_offset == 0) {
 		LOG_INF("Start write file %s", abs_path);
+		set_status(STATUS_BUSY);
 		if (ret == 0 && entry.size > 0) {
 			ret = fs_unlink(abs_path);
 			if (ret < 0) {
@@ -477,6 +534,7 @@ static int cb_write_content(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_
 	if (last_block) {
 		LOG_INF("Finish write file %s, size: %d", abs_path, file_size + data_len);
 		write_offset = 0;
+		set_status(STATUS_IDLE);
 	} else {
 		write_offset += data_len;
 	}
@@ -619,6 +677,9 @@ static int cb_exec_execute(uint16_t obj_inst_id, uint8_t *args, uint16_t args_le
 	(void)fsu_build_full_name(abs_path, sizeof(abs_path), CONFIG_FSU_MOUNT_POINT,
 				  lwm2m_fs_mgmt_file_active_path);
 
+	/* Update the status */
+	set_status(STATUS_BUSY);
+
 	/* Call the registered execute callback */
 	if (execute_cb != NULL) {
 		retval = execute_cb(abs_path);
@@ -626,6 +687,11 @@ static int cb_exec_execute(uint16_t obj_inst_id, uint8_t *args, uint16_t args_le
 
 	/* Log the result */
 	LOG_INF("Execute file %s: %d", abs_path, retval);
+
+	/* On error, update the state/error strings */
+	if (retval != 0) {
+		lcz_lwm2m_obj_fs_mgmt_exec_complete(retval);
+	}
 
 	return retval;
 }
@@ -643,9 +709,7 @@ static int cb_exec_execute(uint16_t obj_inst_id, uint8_t *args, uint16_t args_le
 static int cb_exec_reset(uint16_t obj_inst_id, uint8_t *args, uint16_t args_len)
 {
 	/* Reset the state and error */
-	memset(lwm2m_fs_mgmt_file_status, 0, sizeof(lwm2m_fs_mgmt_file_status));
-	strcpy(lwm2m_fs_mgmt_file_status, STATUS_IDLE);
-	NOTIFY_OBSERVER(LWM2M_OBJECT_FS_MGMT_FILE_ID, 0, FS_MGMT_FILE_STATUS_ID);
+	set_status(STATUS_IDLE);
 	set_error(ERROR_OKAY);
 	return 0;
 }
@@ -702,6 +766,21 @@ void lcz_lwm2m_obj_fs_mgmt_reg_perm_cb(lcz_lwm2m_obj_fs_mgmt_permission_cb cb)
 void lcz_lwm2m_obj_fs_mgmt_reg_exec_cb(lcz_lwm2m_obj_fs_mgmt_exec_cb cb)
 {
 	execute_cb = cb;
+}
+
+void lcz_lwm2m_obj_fs_mgmt_exec_complete(int result)
+{
+	/* Reset the status */
+	set_status(STATUS_IDLE);
+
+	/* Update the error */
+	if (result == 0) {
+		set_error(ERROR_OKAY);
+	} else if (result == -EPERM) {
+		set_error(ERROR_NO_PERM);
+	} else {
+		set_error(ERROR_GENERIC);
+	}
 }
 
 /**************************************************************************************************/
