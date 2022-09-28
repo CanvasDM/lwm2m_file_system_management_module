@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LWM2M  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://openmobilealliance.org/tech/profiles/LWM2M.xsd">
+    <Object ObjectType="MODefinition">
+        <Name>File</Name>
+        <Description1>Filesystem File Access</Description1>
+        <ObjectID>27039</ObjectID>
+        <ObjectURN>urn:oma:lwm2m:x:27039</ObjectURN>
+        <MultipleInstances>Single</MultipleInstances>
+        <Mandatory>Optional</Mandatory>
+        <Resources>
+            <Item ID="0">
+                <Name>File Path</Name>
+                <Operations>RW</Operations>
+                <MultipleInstances>Single</MultipleInstances>
+                <Mandatory>Mandatory</Mandatory>
+                <Type>String</Type>
+                <RangeEnumeration></RangeEnumeration>
+                <Description><![CDATA[The targeted file or directory]]></Description>
+            </Item>
+            <Item ID="1">
+                <Name>File Content</Name>
+                <Operations>RW</Operations>
+                <MultipleInstances>Single</MultipleInstances>
+                <Mandatory>Optional</Mandatory>
+                <Type>Opaque</Type>
+                <RangeEnumeration></RangeEnumeration>
+                <Description><![CDATA[The file content]]></Description>
+            </Item>
+            <Item ID="2">
+                <Name>Delete</Name>
+                <Operations>E</Operations>
+                <MultipleInstances>Single</MultipleInstances>
+                <Mandatory>Mandatory</Mandatory>
+                <Type></Type>
+                <RangeEnumeration></RangeEnumeration>
+                <Description><![CDATA[Delete the targeted file or directory]]></Description>
+            </Item>
+            <Item ID="3">
+                <Name>Mkdir</Name>
+                <Operations>E</Operations>
+                <MultipleInstances>Single</MultipleInstances>
+                <Mandatory>Optional</Mandatory>
+                <Type></Type>
+                <RangeEnumeration></RangeEnumeration>
+                <Description><![CDATA[Create the targeted directory]]></Description>
+            </Item>
+            <Item ID="4">
+                <Name>Execute</Name>
+                <Operations>E</Operations>
+                <MultipleInstances>Single</MultipleInstances>
+                <Mandatory>Optional</Mandatory>
+                <Type></Type>
+                <RangeEnumeration></RangeEnumeration>
+                <Description><![CDATA[Execute a file. the way to execute can be parametrized using the exec agrument (client specific)]]></Description>
+            </Item>
+            <Item ID="5">
+                <Name>Upload URL</Name>
+                <Operations>RW</Operations>
+                <MultipleInstances>Single</MultipleInstances>
+                <Mandatory>Optional</Mandatory>
+                <Type>String</Type>
+                <RangeEnumeration></RangeEnumeration>
+                <Description><![CDATA[URL (either http:// or coap://) for requesting the client to upload the file]]></Description>
+            </Item>
+            <Item ID="6">
+                <Name>Download URL</Name>
+                <Operations>RW</Operations>
+                <MultipleInstances>Single</MultipleInstances>
+                <Mandatory>Optional</Mandatory>
+                <Type>String</Type>
+                <RangeEnumeration></RangeEnumeration>
+                <Description><![CDATA[URL (either http:// or coap://) for requesting the client to download the file and write it on the specified path]]></Description>
+            </Item>
+            <Item ID="7">
+                <Name>Attributes</Name>
+                <Operations>RW</Operations>
+                <MultipleInstances>Single</MultipleInstances>
+                <Mandatory>Optional</Mandatory>
+                <Type>Integer</Type>
+                <RangeEnumeration>0-9999</RangeEnumeration>
+                <Description><![CDATA[Set the Unix style attributes/permissions for the targeted file or directory]]></Description>
+            </Item>
+            <Item ID="8">
+                <Name>Status</Name>
+                <Operations>R</Operations>
+                <MultipleInstances>Single</MultipleInstances>
+                <Mandatory>Mandatory</Mandatory>
+                <Type>String</Type>
+                <RangeEnumeration></RangeEnumeration>
+                <Description><![CDATA[Current execution state: idle, download, upload, error, executing]]></Description>
+            </Item>
+            <Item ID="9">
+                <Name>Error</Name>
+                <Operations>R</Operations>
+                <MultipleInstances>Single</MultipleInstances>
+                <Mandatory>Mandatory</Mandatory>
+                <Type>String</Type>
+                <RangeEnumeration></RangeEnumeration>
+                <Description><![CDATA[Error description ifd the Status is "error"]]></Description>
+            </Item>
+            <Item ID="10">
+                <Name>Progress</Name>
+                <Operations>R</Operations>
+                <MultipleInstances>Single</MultipleInstances>
+                <Mandatory>Optional</Mandatory>
+                <Type>Integer</Type>
+                <RangeEnumeration>0-100</RangeEnumeration>
+                <Description><![CDATA[the progress pourcentage of the download/upload or execution]]></Description>
+            </Item>
+            <Item ID="11">
+                <Name>Reset</Name>
+                <Operations>E</Operations>
+                <MultipleInstances>Single</MultipleInstances>
+                <Mandatory>Optional</Mandatory>
+                <Type></Type>
+                <RangeEnumeration></RangeEnumeration>
+                <Description><![CDATA[cancel the current download/upload/execution and restart to the idle state]]></Description>
+            </Item>
+        </Resources>
+    </Object>
+</LWM2M>
