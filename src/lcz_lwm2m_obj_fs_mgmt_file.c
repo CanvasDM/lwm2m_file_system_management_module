@@ -525,7 +525,7 @@ static int cb_write_content(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_
 	if (ret != data_len) {
 		set_error(ERROR_GENERIC);
 		LOG_ERR("cb_write_content: Error appending to %s: length mismatch %d != %d",
-			log_strdup(abs_path), ret, data_len);
+			abs_path, ret, data_len);
 		return -ENOSPC;
 	}
 	LOG_DBG("Wrote %d bytes to %s", data_len, abs_path);
