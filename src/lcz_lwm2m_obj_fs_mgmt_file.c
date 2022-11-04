@@ -267,11 +267,13 @@ static void *cb_read(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id
 	read_len = *data_len;
 	if (read_len > sizeof(block_buffer)) {
 		read_len = sizeof(block_buffer);
-		LOG_INF("Start read file %s, size %d", abs_path, entry.size);
-		set_status(STATUS_BUSY);
-	} else {
-		LOG_INF("Read file %s, size %d", abs_path, entry.size);
 	}
+
+	if (strcmp(lwm2m_fs_mgmt_file_status, STATUS_BUSY) != 0) {
+		LOG_INF("Start read file %s, size %d", abs_path, entry.size);
+	}
+
+	set_status(STATUS_BUSY);
 
 /* Read the block from the file */
 #if defined(CONFIG_FSU_ENCRYPTED_FILES)
