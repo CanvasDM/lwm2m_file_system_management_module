@@ -8,23 +8,24 @@
 /**************************************************************************************************/
 /* Includes                                                                                       */
 /**************************************************************************************************/
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(net_lwm2m_obj_fs_file, CONFIG_LCZ_LWM2M_FS_MANAGEMENT_LOG_LEVEL);
 
 #include <string.h>
-#include <init.h>
-#include <zephyr.h>
-#include <device.h>
-#include <fs/fs.h>
 #include <stdint.h>
-#include <lcz_lwm2m.h>
+#include <zephyr/init.h>
+#include <zephyr/zephyr.h>
+#include <zephyr/device.h>
+#include <zephyr/fs/fs.h>
+#include <zephyr/net/lwm2m.h>
 
-#include "lwm2m_object.h"
-#include "lwm2m_engine.h"
-#include "file_system_utilities.h"
+#include <lwm2m_object.h>
+#include <lwm2m_engine.h>
+#include <file_system_utilities.h>
 #if defined(CONFIG_FSU_ENCRYPTED_FILES)
-#include "encrypted_file_storage.h"
+#include <encrypted_file_storage.h>
 #endif
+
 #include "lcz_lwm2m_obj_fs_mgmt.h"
 
 /**************************************************************************************************/
@@ -112,7 +113,7 @@ static lcz_lwm2m_obj_fs_mgmt_permission_cb permission_cb = NULL;
 static lcz_lwm2m_obj_fs_mgmt_exec_cb execute_cb = NULL;
 
 /* The block buffer holds data used for active read and write operations */
-static uint8_t block_buffer[CONFIG_LCZ_LWM2M_COAP_BLOCK_SIZE];
+static uint8_t block_buffer[CONFIG_LWM2M_COAP_BLOCK_SIZE];
 
 /* Delayble work for "busy" status timeout */
 static K_WORK_DELAYABLE_DEFINE(busy_timeout, busy_timeout_handler);
@@ -131,7 +132,7 @@ static void set_status(const char *status_string)
 		memset(lwm2m_fs_mgmt_file_status, 0, sizeof(lwm2m_fs_mgmt_file_status));
 		strcpy(lwm2m_fs_mgmt_file_status, status_string);
 		LOG_DBG("status [%s]", lwm2m_fs_mgmt_file_status);
-		NOTIFY_OBSERVER(LWM2M_OBJECT_FS_MGMT_FILE_ID, 0, FS_MGMT_FILE_STATUS_ID);
+		lwm2m_notify_observer(LWM2M_OBJECT_FS_MGMT_FILE_ID, 0, FS_MGMT_FILE_STATUS_ID);
 	}
 
 	/* Make the File Path resource read-only when the status is busy */
@@ -159,7 +160,7 @@ static void set_error(const char *error_string)
 		memset(lwm2m_fs_mgmt_file_error, 0, sizeof(lwm2m_fs_mgmt_file_error));
 		strcpy(lwm2m_fs_mgmt_file_error, error_string);
 		LOG_DBG("err [%s]", lwm2m_fs_mgmt_file_error);
-		NOTIFY_OBSERVER(LWM2M_OBJECT_FS_MGMT_FILE_ID, 0, FS_MGMT_FILE_ERROR_ID);
+		lwm2m_notify_observer(LWM2M_OBJECT_FS_MGMT_FILE_ID, 0, FS_MGMT_FILE_ERROR_ID);
 	}
 }
 
@@ -493,6 +494,9 @@ static int cb_write_content(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_
 				abs_path, ret);
 			return ret;
 		}
+
+		/* Keep the status busy while we're writing */
+		set_status(STATUS_BUSY);
 
 		/* Writes can only happen at the end of the file */
 #if defined(CONFIG_FSU_ENCRYPTED_FILES)

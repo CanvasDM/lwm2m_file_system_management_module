@@ -8,23 +8,25 @@
 /**************************************************************************************************/
 /* Includes                                                                                       */
 /**************************************************************************************************/
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(net_lwm2m_obj_fs_dir, CONFIG_LCZ_LWM2M_FS_MANAGEMENT_LOG_LEVEL);
 
 #include <string.h>
-#include <init.h>
-#include <zephyr.h>
-#include <device.h>
-#include <fs/fs.h>
 #include <stdint.h>
-#include <lcz_lwm2m.h>
+#include <zephyr/init.h>
+#include <zephyr/zephyr.h>
+#include <zephyr/device.h>
+#include <zephyr/fs/fs.h>
+#include <zephyr/net/lwm2m.h>
 
-#include "lwm2m_object.h"
-#include "lwm2m_engine.h"
-#include "file_system_utilities.h"
+#include <lwm2m_object.h>
+#include <lwm2m_engine.h>
+#include <file_system_utilities.h>
 #if defined(CONFIG_FSU_ENCRYPTED_FILES)
-#include "encrypted_file_storage.h"
+#include <encrypted_file_storage.h>
 #endif
+
+#include "lcz_lwm2m_obj_fs_mgmt.h"
 
 /**************************************************************************************************/
 /* Global Constant, Macro and Type Definitions                                                    */
@@ -98,7 +100,7 @@ static void set_status (const char *status_string)
 	if (strcmp(lwm2m_fs_mgmt_dir_status, status_string) != 0) {
 		memset(lwm2m_fs_mgmt_dir_status, 0, sizeof(lwm2m_fs_mgmt_dir_status));
 		strcpy(lwm2m_fs_mgmt_dir_status, status_string);
-		NOTIFY_OBSERVER(LWM2M_OBJECT_FS_MGMT_DIRECTORY_ID, 0, FS_MGMT_DIR_STATUS_ID);
+		lwm2m_notify_observer(LWM2M_OBJECT_FS_MGMT_DIRECTORY_ID, 0, FS_MGMT_DIR_STATUS_ID);
 	}
 }
 
@@ -231,9 +233,9 @@ static int cb_write_active_path(uint16_t obj_inst_id, uint16_t res_id, uint16_t 
 	}
 
 	/* Generate notifies for files, sizes, and attributes */
-	NOTIFY_OBSERVER(LWM2M_OBJECT_FS_MGMT_DIRECTORY_ID, 0, FS_MGMT_DIR_FILES_ID);
-	NOTIFY_OBSERVER(LWM2M_OBJECT_FS_MGMT_DIRECTORY_ID, 0, FS_MGMT_DIR_SIZES_ID);
-	NOTIFY_OBSERVER(LWM2M_OBJECT_FS_MGMT_DIRECTORY_ID, 0, FS_MGMT_DIR_ATTRIBUTES_ID);
+	lwm2m_notify_observer(LWM2M_OBJECT_FS_MGMT_DIRECTORY_ID, 0, FS_MGMT_DIR_FILES_ID);
+	lwm2m_notify_observer(LWM2M_OBJECT_FS_MGMT_DIRECTORY_ID, 0, FS_MGMT_DIR_SIZES_ID);
+	lwm2m_notify_observer(LWM2M_OBJECT_FS_MGMT_DIRECTORY_ID, 0, FS_MGMT_DIR_ATTRIBUTES_ID);
 
 	return 0;
 }
