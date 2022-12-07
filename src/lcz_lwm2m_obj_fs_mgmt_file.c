@@ -65,6 +65,11 @@ LOG_MODULE_REGISTER(net_lwm2m_obj_fs_file, CONFIG_LCZ_LWM2M_FS_MANAGEMENT_LOG_LE
 /* Time to stay in "busy" state without requests from server */
 #define BUSY_STATUS_TIMEOUT 15 /* seconds */
 
+enum file_read_state {
+	READ_STATE_GET_SIZE = 0,
+	READ_STATE_GET_DATA,
+};
+
 /**************************************************************************************************/
 /* Local Function Prototypes                                                                      */
 /**************************************************************************************************/
@@ -118,6 +123,9 @@ static uint8_t block_buffer[CONFIG_LWM2M_COAP_BLOCK_SIZE];
 /* Delayble work for "busy" status timeout */
 static K_WORK_DELAYABLE_DEFINE(busy_timeout, busy_timeout_handler);
 
+static uint8_t read_state;
+static size_t last_offset;
+
 /**************************************************************************************************/
 /* Local Function Definitions                                                                     */
 /**************************************************************************************************/
@@ -157,6 +165,7 @@ static void set_status(const char *status_string)
 static void set_error(const char *error_string)
 {
 	if (strcmp(lwm2m_fs_mgmt_file_error, error_string) != 0) {
+		set_status(STATUS_IDLE);
 		memset(lwm2m_fs_mgmt_file_error, 0, sizeof(lwm2m_fs_mgmt_file_error));
 		strcpy(lwm2m_fs_mgmt_file_error, error_string);
 		LOG_DBG("err [%s]", lwm2m_fs_mgmt_file_error);
@@ -200,7 +209,7 @@ static void busy_timeout_handler(struct k_work *work)
  * @param[in] res_id Resource ID generating the callback.
  * @param[in] res_inst_id Resource instance ID generating the callback
  *                        (typically 0 for non-multi instance resources).
- * @param[out] data_len Length of the data buffer.
+ * @param[out] data_len Length of the file to be read.
  *
  * @return Callback returns a pointer to the data buffer or NULL for failure.
  */
@@ -272,6 +281,10 @@ static void *cb_read(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id
 
 	if (strcmp(lwm2m_fs_mgmt_file_status, STATUS_BUSY) != 0) {
 		LOG_INF("Start read file %s, size %d", abs_path, entry.size);
+		last_offset = 0;
+		read_state = READ_STATE_GET_SIZE;
+	} else {
+		read_state = READ_STATE_GET_DATA;
 	}
 
 	set_status(STATUS_BUSY);
@@ -290,6 +303,9 @@ static void *cb_read(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_inst_id
 		set_error(ERROR_GENERIC);
 		*data_len = 0;
 		return NULL;
+	} else if (*data_len <= sizeof(block_buffer) && read_state == READ_STATE_GET_DATA) {
+		LOG_INF("Finished reading file %s", abs_path);
+		set_status(STATUS_IDLE);
 	}
 
 	return block_buffer;
@@ -373,6 +389,12 @@ static void *cb_read_block(uint16_t obj_inst_id, uint16_t res_id, uint16_t res_i
 		return NULL;
 	}
 	LOG_DBG("Read file at offset %d, read %d", offset, ret);
+
+	if (offset < last_offset) {
+		/* Warn users if the file transfer is starting over */
+		LOG_WRN("Started reading file at new offset %d (old: %d)", offset, last_offset);
+	}
+	last_offset = offset;
 
 	/* Update the tracking variables */
 	*data_len = ret;
